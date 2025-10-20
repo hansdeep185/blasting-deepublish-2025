@@ -38,12 +38,20 @@ Route::middleware(['auth', 'role:user'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
     
+    // Account Management
+    Route::resource('accounts', App\Http\Controllers\AccountController::class);
+    Route::post('/accounts/{account}/reconnect', [App\Http\Controllers\AccountController::class, 'reconnect'])
+        ->name('accounts.reconnect');
+    Route::post('/accounts/{account}/toggle-ai', [App\Http\Controllers\AccountController::class, 'toggleAi'])
+        ->name('accounts.toggle-ai');
+    
     // Placeholder routes - akan diimplementasikan di fase selanjutnya
-    Route::get('/accounts', fn() => view('under-construction'))->name('accounts.index');
     Route::get('/contact-lists', fn() => view('under-construction'))->name('contact-lists.index');
     Route::get('/templates', fn() => view('under-construction'))->name('templates.index');
     Route::get('/blasts', fn() => view('under-construction'))->name('blasts.index');
+    Route::get('/blasts/create', fn() => view('under-construction'))->name('blasts.create');
     Route::get('/chats', fn() => view('under-construction'))->name('chats.index');
+    Route::get('/chats/{account}', fn() => view('under-construction'))->name('chats.show');
     Route::get('/training', fn() => view('under-construction'))->name('training.index');
 });
 
@@ -52,6 +60,13 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])
         ->name('dashboard');
     
+    // User Management
+    Route::resource('users', App\Http\Controllers\Admin\UserController::class);
+    Route::post('/users/{user}/toggle-status', [App\Http\Controllers\Admin\UserController::class, 'toggleStatus'])
+        ->name('users.toggle-status');
+    Route::post('/users/{user}/reset-quota', [App\Http\Controllers\Admin\UserController::class, 'resetQuota'])
+        ->name('users.reset-quota');
+    
     // Settings Management
     Route::get('/settings', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
@@ -59,7 +74,6 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/settings/test-n8n', [SettingController::class, 'testN8n'])->name('settings.test-n8n');
     
     // Placeholder routes - akan diimplementasikan di fase selanjutnya
-    Route::get('/users', fn() => view('under-construction'))->name('users.index');
     Route::get('/accounts', fn() => view('under-construction'))->name('accounts.index');
     Route::get('/audit-logs', fn() => view('under-construction'))->name('audit-logs.index');
     Route::get('/monitor', fn() => view('under-construction'))->name('monitor.index');
