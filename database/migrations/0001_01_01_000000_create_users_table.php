@@ -15,8 +15,13 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('google_id')->unique()->nullable();
+            $table->string('avatar')->nullable();
+            $table->enum('role', ['admin', 'user'])->default('user');
+            $table->integer('message_quota')->default(10000);
+            $table->integer('message_used')->default(0);
+            $table->boolean('is_active')->default(true);
             $table->timestamp('email_verified_at')->nullable();
-            $table->string('password');
             $table->rememberToken();
             $table->timestamps();
         });
