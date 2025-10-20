@@ -35,4 +35,26 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
+    ],
+
+    'waha' => [
+        'base_url' => env('WAHA_BASE_URL'),
+        'api_key' => env('WAHA_API_KEY'),
+    ],
+
+    'n8n' => [
+        'webhook_url' => env('N8N_WEBHOOK_URL'),
+        'api_key' => env('N8N_API_KEY'),
+    ],
+
+    'ai' => [
+        'gemini_key' => env('GEMINI_API_KEY'),
+        'openai_key' => env('OPENAI_API_KEY'),
+        'default_provider' => env('AI_DEFAULT_PROVIDER', 'gemini'),
+    ],
+
 ];

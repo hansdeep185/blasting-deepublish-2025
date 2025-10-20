@@ -1,11 +1,44 @@
-@import 'tailwindcss';
+@import 'bootstrap/dist/css/bootstrap.min.css';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
+/* Custom styles */
+:root {
+    --primary-color: #25D366;
+    --secondary-color: #128C7E;
+    --dark-color: #075E54;
+}
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.sidebar {
+    min-height: 100vh;
+    background: linear-gradient(180deg, var(--dark-color) 0%, var(--secondary-color) 100%);
+}
+
+.btn-whatsapp {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn-whatsapp:hover {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.chat-message {
+    max-width: 70%;
+    margin-bottom: 1rem;
+}
+
+.chat-message.inbound {
+    background-color: #fff;
+    border-radius: 0.5rem 0.5rem 0.5rem 0;
+}
+
+.chat-message.outbound {
+    background-color: #DCF8C6;
+    border-radius: 0.5rem 0.5rem 0 0.5rem;
+    margin-left: auto;
 }
