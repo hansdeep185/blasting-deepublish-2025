@@ -1,24 +1,66 @@
-*.log
-.DS_Store
+/node_modules
+/vendor
+/public/hot
+/public/storage
+/public/build
+/storage/*.key
+/storage/pail
+/auth.json
 .env
 .env.backup
+.env.testing
+.env.staging
 .env.production
 .phpactor.json
 .phpunit.result.cache
-/.fleet
-/.idea
-/.nova
-/.phpunit.cache
-/.vscode
-/.zed
-/auth.json
-/node_modules
-/public/build
-/public/hot
-/public/storage
-/storage/*.key
-/storage/pail
-/vendor
+.phpunit.cache
+.DS_Store
+Thumbs.db
+
+# -----------------
+# LARAVEL SPECIFIC
+# -----------------
+# Exclude compiled views and cache files
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+
+# Exclude compiled PHP code (optimizations)
+/vendor/compiled.php
+
+# Exclude Log files (sudah ada *.log, tapi ini lebih spesifik)
+/storage/logs/*.log
+!/storage/logs/.gitignore
+
+# Exclude Debugging tools and profiling data
+/debugbar/*
+/telescope.sqlite
+
+# -----------------
+# IDE & OS FOLDERS
+# -----------------
+/.idea             # PHPStorm / IntelliJ
+/.vscode           # VS Code settings
+/.fleet            # JetBrains Fleet
+/.zed              # Zed editor
+/.nova             # Nova editor
 Homestead.json
 Homestead.yaml
-Thumbs.db
+
+# -----------------
+# CUSTOM PROJECT SPECIFIC
+# -----------------
+# 1. WAHA Session Data (Sangat Penting: hindari session token/data masuk ke Git)
+# Jika WAHA menyimpan file atau folder session di storage/app atau di root,
+# pastikan untuk mengecualikannya. Contoh:
+/storage/app/waha-sessions/*
+
+# 2. Database/Vector Cache
+# Jika Anda menggunakan SQLite untuk local development atau cache
+/*.sqlite
+/storage/db.sqlite
+
+# 3. N8N or AI Agent Configuration (Local Development)
+# File konfigurasi yang mungkin berisi API Keys atau endpoints
+/n8n-config/
