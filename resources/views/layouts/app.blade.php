@@ -51,15 +51,15 @@
                     <hr class="text-white-50 my-2">
                 </li>
 
-                <!-- Placeholder Routes - Coming Soon -->
+                <!-- Templates - NOW ACTIVE -->
                 <li class="nav-item mb-2">
-                    <a href="{{ url('/templates') }}" 
-                       class="nav-link text-white-50 {{ request()->is('templates*') ? 'active bg-white bg-opacity-25 rounded' : '' }}"
-                       style="opacity: 0.6;">
+                    <a href="{{ route('templates.index') }}" 
+                       class="nav-link text-white {{ request()->routeIs('templates.*') ? 'active bg-white bg-opacity-25 rounded' : '' }}">
                         <i class="bi bi-file-text"></i> Templates
-                        <span class="badge bg-secondary ms-2" style="font-size: 0.65rem;">Soon</span>
                     </a>
                 </li>
+
+                <!-- Coming Soon Routes -->
                 <li class="nav-item mb-2">
                     <a href="{{ url('/blasts') }}" 
                        class="nav-link text-white-50 {{ request()->is('blasts*') ? 'active bg-white bg-opacity-25 rounded' : '' }}"
@@ -113,15 +113,15 @@
                     <hr class="text-white-50 my-2">
                 </li>
 
-                <!-- Placeholder Admin Routes -->
+                <!-- Admin - All Accounts - NOW ACTIVE -->
                 <li class="nav-item mb-2">
-                    <a href="{{ url('/admin/accounts') }}" 
-                       class="nav-link text-white-50 {{ request()->is('admin/accounts*') ? 'active bg-white bg-opacity-25 rounded' : '' }}"
-                       style="opacity: 0.6;">
+                    <a href="{{ route('admin.accounts.index') }}" 
+                       class="nav-link text-white {{ request()->routeIs('admin.accounts.*') ? 'active bg-white bg-opacity-25 rounded' : '' }}">
                         <i class="bi bi-phone"></i> All Accounts
-                        <span class="badge bg-secondary ms-2" style="font-size: 0.65rem;">Soon</span>
                     </a>
                 </li>
+
+                <!-- Coming Soon Admin Routes -->
                 <li class="nav-item mb-2">
                     <a href="{{ url('/admin/monitor') }}" 
                        class="nav-link text-white-50 {{ request()->is('admin/monitor*') ? 'active bg-white bg-opacity-25 rounded' : '' }}"

@@ -2,47 +2,63 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AuditLog;
 use App\Models\Contact;
 use App\Models\ContactList;
 use App\Models\ContactTag;
 use Illuminate\Http\Request;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Imports\ContactsImport;
 
 class ContactController extends Controller
 {
     /**
-     * Display a listing of contacts
+     * Display a listing of contacts in a contact list
      */
-    public function index(Request $request, ContactList $contactList)
+    public function index(ContactList $contactList)
     {
-        // Authorization check
+        // Check authorization
         if ($contactList->user_id !== auth()->id()) {
             abort(403);
         }
 
+        // Get contacts with pagination
         $query = $contactList->contacts()->with('tags');
 
-        // Filter by tag
-        if ($request->filled('tag_id')) {
-            $query->withTag($request->tag_id);
-        }
-
         // Search
-        if ($request->filled('search')) {
-            $search = $request->search;
+        if (request()->filled('search')) {
+            $search = request('search');
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('phone_number', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('company', 'like', "%{$search}%");
             });
         }
 
-        $contacts = $query->latest()->paginate(50);
-        $tags = $contactList->contactTags;
+        // Filter by tag
+        if (request()->filled('tag_id')) {
+            $query->whereHas('tags', function($q) {
+                $q->where('contact_tags.id', request('tag_id'));
+            });
+        }
 
-        return view('contacts.index', compact('contactList', 'contacts', 'tags'));
+        // Filter by status
+        if (request()->filled('status')) {
+            $query->where('is_active', request('status') === 'active');
+        }
+
+        $contacts = $query->latest()->paginate(20);
+
+        // Get all tags for filter
+        $tags = $contactList->tags()->orderBy('name')->get();
+
+        // Stats
+        $stats = [
+            'total' => $contactList->contacts()->count(),
+            'active' => $contactList->contacts()->where('is_active', true)->count(),
+            'with_email' => $contactList->contacts()->whereNotNull('email')->where('email', '!=', '')->count(),
+            'tagged' => $contactList->contacts()->has('tags')->count(),
+        ];
+
+        return view('contacts.index', compact('contactList', 'contacts', 'tags', 'stats'));
     }
 
     /**
@@ -50,211 +66,90 @@ class ContactController extends Controller
      */
     public function create(ContactList $contactList)
     {
-        // Authorization check
+        // Check authorization
         if ($contactList->user_id !== auth()->id()) {
             abort(403);
         }
 
-        $tags = $contactList->tags;
+        $tags = $contactList->tags()->orderBy('name')->get();
+
         return view('contacts.create', compact('contactList', 'tags'));
+    }
+    
+    /**
+     * Show the form for importing contacts
+     */
+    public function importForm(ContactList $contactList)
+    {
+        // Check authorization
+        if ($contactList->user_id !== auth()->id()) {
+            abort(403);
+        }
+        
+        $tags = $contactList->tags()->orderBy('name')->get();
+
+        return view('contacts.import', compact('contactList', 'tags'));
     }
 
     /**
      * Store a newly created contact
      */
-    public function store(Request $request, ContactList $contactList)
+    public function store(Request $request)
     {
-        // Authorization check
+        $validated = $request->validate([
+            'contact_list_id' => 'required|exists:contact_lists,id',
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'company' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
+            'tag_ids' => 'nullable|array',
+            'tag_ids.*' => 'exists:contact_tags,id',
+            'custom_fields' => 'nullable|array',
+        ]);
+
+        $contactList = ContactList::findOrFail($validated['contact_list_id']);
+
+        // Check authorization
         if ($contactList->user_id !== auth()->id()) {
             abort(403);
         }
 
-        $request->validate([
-            'phone_number' => 'required|string|max:20',
-            'name' => 'nullable|string|max:255',
-            'email' => 'nullable|email',
-            'tag_ids' => 'nullable|array',
-            'tag_ids.*' => 'exists:contact_tags,id',
-        ]);
-
-        // Format phone number (remove non-numeric)
-        $phoneNumber = preg_replace('/[^0-9]/', '', $request->phone_number);
-        
-        // Check for duplicates
-        $exists = $contactList->contacts()
-            ->where('phone_number', $phoneNumber)
-            ->exists();
-
-        if ($exists) {
-            return back()->with('error', 'This phone number already exists in this list!');
-        }
-
-        $contact = $contactList->contacts()->create([
-            'phone_number' => $phoneNumber,
-            'name' => $request->name,
-            'email' => $request->email,
-            'custom_fields' => [],
+        // Create contact
+        $contact = Contact::create([
+            'contact_list_id' => $contactList->id,
+            'name' => $validated['name'],
+            'phone' => $validated['phone'] ?? '',
+            'email' => $validated['email'] ?? '',
+            'company' => $validated['company'] ?? '',
+            'notes' => $validated['notes'] ?? '',
+            'custom_fields' => $validated['custom_fields'] ?? null,
+            'is_active' => true,
         ]);
 
         // Attach tags
-        if ($request->filled('tag_ids')) {
-            $contact->tags()->attach($request->tag_ids);
+        if (!empty($validated['tag_ids'])) {
+            $contact->tags()->attach($validated['tag_ids']);
         }
 
-        // Update contact count
-        $contactList->updateContactCount();
-
-        AuditLog::logActivity(
-            action: 'create_contact',
-            description: "Added contact: {$contact->name} to list: {$contactList->name}",
-            modelType: Contact::class,
-            modelId: $contact->id
-        );
-
-        return redirect()->route('contacts.index', $contactList)
-            ->with('success', 'Contact added successfully!');
+        return redirect()
+            ->route('contacts.index', $contactList) // FIX: Menggunakan nama route yang benar
+            ->with('success', 'Contact created successfully!');
     }
 
     /**
-     * Show import form
+     * Display the specified contact
      */
-    public function importForm(ContactList $contactList)
+    public function show(ContactList $contactList, Contact $contact)
     {
-        // Authorization check
-        if ($contactList->user_id !== auth()->id()) {
+        // Check authorization
+        if ($contactList->user_id !== auth()->id() || $contact->contact_list_id !== $contactList->id) {
             abort(403);
         }
 
-        $tags = $contactList->tags;
-        return view('contacts.import', compact('contactList', 'tags'));
-    }
+        $contact->load('tags');
 
-    /**
-     * Download CSV template
-     */
-    public function downloadTemplate()
-    {
-        $filename = 'contact_import_template.csv';
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"$filename\"",
-        ];
-
-        $callback = function() {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, ['phone_number', 'name', 'email']);
-            
-            // Add sample data
-            fputcsv($file, ['08123456789', 'John Doe', 'john@example.com']);
-            fputcsv($file, ['08987654321', 'Jane Smith', 'jane@example.com']);
-            
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
-    }
-
-    /**
-     * Import contacts from file
-     */
-    public function import(Request $request, ContactList $contactList)
-    {
-        // Authorization check
-        if ($contactList->user_id !== auth()->id()) {
-            abort(403);
-        }
-
-        $request->validate([
-            'file' => 'required|file|mimes:csv,xlsx,xls|max:10240', // Max 10MB
-            'tag_id' => 'nullable|exists:contact_tags,id',
-        ]);
-
-        try {
-            $file = $request->file('file');
-            $tagId = $request->tag_id;
-            
-            // Read file
-            $data = Excel::toArray(new ContactsImport, $file);
-            
-            if (empty($data) || empty($data[0])) {
-                return back()->with('error', 'File is empty or invalid format!');
-            }
-
-            $rows = $data[0];
-            $header = array_shift($rows); // Remove header row
-            
-            // Normalize headers
-            $header = array_map('strtolower', array_map('trim', $header));
-            
-            $imported = 0;
-            $duplicates = 0;
-            $errors = 0;
-
-            foreach ($rows as $row) {
-                if (empty($row[0])) continue; // Skip empty rows
-                
-                $rowData = array_combine($header, $row);
-                
-                // Get phone number (try different column names)
-                $phoneNumber = $rowData['phone'] 
-                    ?? $rowData['phone_number'] 
-                    ?? $rowData['number'] 
-                    ?? $rowData['no'] 
-                    ?? null;
-
-                if (!$phoneNumber) {
-                    $errors++;
-                    continue;
-                }
-
-                // Clean phone number
-                $phoneNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
-                
-                // Check duplicate
-                $exists = $contactList->contacts()
-                    ->where('phone_number', $phoneNumber)
-                    ->exists();
-
-                if ($exists) {
-                    $duplicates++;
-                    continue;
-                }
-
-                // Create contact
-                $contact = $contactList->contacts()->create([
-                    'phone_number' => $phoneNumber,
-                    'name' => $rowData['name'] ?? $rowData['nama'] ?? null,
-                    'email' => $rowData['email'] ?? null,
-                    'custom_fields' => $rowData,
-                ]);
-
-                // Attach tag if specified
-                if ($tagId) {
-                    $contact->tags()->attach($tagId);
-                }
-
-                $imported++;
-            }
-
-            // Update contact count
-            $contactList->updateContactCount();
-
-            AuditLog::logActivity(
-                action: 'import_contacts',
-                description: "Imported {$imported} contacts to list: {$contactList->name}",
-                modelType: ContactList::class,
-                modelId: $contactList->id
-            );
-
-            $message = "Import completed! Imported: {$imported}";
-            if ($duplicates > 0) $message .= ", Duplicates: {$duplicates}";
-            if ($errors > 0) $message .= ", Errors: {$errors}";
-
-            return back()->with('success', $message);
-
-        } catch (\Exception $e) {
-            return back()->with('error', 'Import failed: ' . $e->getMessage());
-        }
+        return view('contacts.show', compact('contactList', 'contact'));
     }
 
     /**
@@ -262,14 +157,14 @@ class ContactController extends Controller
      */
     public function edit(ContactList $contactList, Contact $contact)
     {
-        // Authorization check
+        // Check authorization
         if ($contactList->user_id !== auth()->id() || $contact->contact_list_id !== $contactList->id) {
             abort(403);
         }
 
-        $tags = $contactList->tags;
         $contact->load('tags');
-        
+        $tags = $contactList->tags()->orderBy('name')->get();
+
         return view('contacts.edit', compact('contactList', 'contact', 'tags'));
     }
 
@@ -278,31 +173,40 @@ class ContactController extends Controller
      */
     public function update(Request $request, ContactList $contactList, Contact $contact)
     {
-        // Authorization check
+        // Check authorization
         if ($contactList->user_id !== auth()->id() || $contact->contact_list_id !== $contactList->id) {
             abort(403);
         }
 
-        $request->validate([
-            'phone_number' => 'required|string|max:20',
-            'name' => 'nullable|string|max:255',
-            'email' => 'nullable|email',
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'company' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
             'tag_ids' => 'nullable|array',
             'tag_ids.*' => 'exists:contact_tags,id',
+            'custom_fields' => 'nullable|array',
         ]);
 
-        $phoneNumber = preg_replace('/[^0-9]/', '', $request->phone_number);
-
         $contact->update([
-            'phone_number' => $phoneNumber,
-            'name' => $request->name,
-            'email' => $request->email,
+            'name' => $validated['name'],
+            'phone' => $validated['phone'] ?? '',
+            'email' => $validated['email'] ?? '',
+            'company' => $validated['company'] ?? '',
+            'notes' => $validated['notes'] ?? '',
+            'custom_fields' => $validated['custom_fields'] ?? null,
         ]);
 
         // Sync tags
-        $contact->tags()->sync($request->tag_ids ?? []);
+        if (isset($validated['tag_ids'])) {
+            $contact->tags()->sync($validated['tag_ids']);
+        } else {
+            $contact->tags()->detach();
+        }
 
-        return redirect()->route('contacts.index', $contactList)
+        return redirect()
+            ->route('contacts.index', $contactList) // FIX: Menggunakan nama route yang benar
             ->with('success', 'Contact updated successfully!');
     }
 
@@ -311,17 +215,157 @@ class ContactController extends Controller
      */
     public function destroy(ContactList $contactList, Contact $contact)
     {
-        // Authorization check
+        // Check authorization
         if ($contactList->user_id !== auth()->id() || $contact->contact_list_id !== $contactList->id) {
             abort(403);
         }
 
         $contact->delete();
-        
-        // Update contact count
-        $contactList->updateContactCount();
 
-        return back()->with('success', 'Contact deleted successfully!');
+        return redirect()
+            ->route('contacts.index', $contactList) // FIX: Menggunakan nama route yang benar
+            ->with('success', 'Contact deleted successfully!');
+    }
+
+    /**
+     * Import contacts from CSV
+     */
+    public function import(Request $request)
+    {
+        $request->validate([
+            'contact_list_id' => 'required|exists:contact_lists,id',
+            'csv_file' => 'required|file|mimes:csv,txt',
+            'has_header' => 'boolean',
+            'tag_ids' => 'nullable|array',
+            'tag_ids.*' => 'exists:contact_tags,id',
+        ]);
+
+        $contactList = ContactList::findOrFail($request->contact_list_id);
+
+        // Check authorization
+        if ($contactList->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        try {
+            $file = $request->file('csv_file');
+            $hasHeader = $request->boolean('has_header', true);
+            
+            $csvData = array_map('str_getcsv', file($file->getRealPath()));
+            
+            $headers = $hasHeader ? array_shift($csvData) : [];
+            $headers = array_map('trim', $headers);
+            $headers = array_map('strtolower', $headers);
+            
+            $standardColumns = ['name', 'phone', 'email', 'company', 'notes'];
+            
+            $customFieldColumns = [];
+            foreach ($headers as $index => $header) {
+                if (!in_array($header, $standardColumns)) {
+                    $customFieldColumns[$index] = $header;
+                }
+            }
+            
+            $imported = 0;
+            $skipped = 0;
+            $errors = [];
+
+            foreach ($csvData as $rowIndex => $row) {
+                try {
+                    if (empty(array_filter($row))) {
+                        continue;
+                    }
+
+                    $data = [];
+                    $customFields = [];
+                    
+                    foreach ($row as $index => $value) {
+                        $value = trim($value);
+                        
+                        if ($hasHeader && isset($headers[$index])) {
+                            $header = $headers[$index];
+                            
+                            if (in_array($header, $standardColumns)) {
+                                $data[$header] = $value;
+                            }
+                            else if (isset($customFieldColumns[$index])) {
+                                $customFields[$customFieldColumns[$index]] = $value;
+                            }
+                        } else {
+                            if ($index == 0) $data['name'] = $value;
+                            if ($index == 1) $data['phone'] = $value;
+                            if ($index == 2) $data['email'] = $value;
+                            if ($index == 3) $data['company'] = $value;
+                            if ($index >= 4) {
+                                $customFields["custom_field_" . ($index - 3)] = $value;
+                            }
+                        }
+                    }
+
+                    if (empty($data['name']) && empty($data['phone'])) {
+                        $skipped++;
+                        $errors[] = "Row " . ($rowIndex + 2) . ": Missing name and phone";
+                        continue;
+                    }
+
+                    if (empty($data['name'])) {
+                        $data['name'] = $data['phone'] ?? 'Unknown';
+                    }
+
+                    $contact = Contact::create([
+                        'contact_list_id' => $contactList->id,
+                        'name' => $data['name'] ?? '',
+                        'phone' => $data['phone'] ?? '',
+                        'email' => $data['email'] ?? '',
+                        'company' => $data['company'] ?? '',
+                        'notes' => $data['notes'] ?? '',
+                        'custom_fields' => !empty($customFields) ? $customFields : null,
+                        'is_active' => true,
+                    ]);
+
+                    if ($request->has('tag_ids') && !empty($request->tag_ids)) {
+                        $contact->tags()->attach($request->tag_ids);
+                    }
+
+                    $imported++;
+
+                } catch (\Exception $e) {
+                    $skipped++;
+                    $errors[] = "Row " . ($rowIndex + 2) . ": " . $e->getMessage();
+                }
+            }
+
+            $message = "Imported {$imported} contacts successfully.";
+            if ($skipped > 0) {
+                $message .= " Skipped {$skipped} rows.";
+            }
+
+            if (!empty($errors)) {
+                session()->flash('import_errors', $errors);
+            }
+
+            return redirect()
+                ->route('contacts.index', $contactList) // FIX: Menggunakan nama route yang benar
+                ->with('success', $message);
+
+        } catch (\Exception $e) {
+            return back()->with('error', 'Import failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Download CSV template with custom field examples
+     */
+    public function downloadTemplate()
+    {
+        $csv = "name,phone,email,company,notes,discount,product_interest,birthday,city\n";
+        $csv .= "John Doe,08123456789,john@example.com,PT Example,VIP Customer,10,Laptop,1990-01-15,Jakarta\n";
+        $csv .= "Jane Smith,08234567890,jane@example.com,ABC Corp,New customer,5,Smartphone,1985-05-20,Bandung\n";
+        $csv .= "Bob Wilson,08345678901,bob@example.com,XYZ Ltd,,15,Tablet,1992-08-10,Surabaya\n";
+
+        return response($csv)
+            ->header('Content-Type', 'text/csv')
+            ->header('Content-Disposition', 'attachment; filename="contacts_template_with_custom_fields.csv"');
     }
 
     /**
@@ -329,7 +373,7 @@ class ContactController extends Controller
      */
     public function bulkDelete(Request $request, ContactList $contactList)
     {
-        // Authorization check
+        // Check authorization
         if ($contactList->user_id !== auth()->id()) {
             abort(403);
         }
@@ -343,9 +387,26 @@ class ContactController extends Controller
             ->where('contact_list_id', $contactList->id)
             ->delete();
 
-        // Update contact count
-        $contactList->updateContactCount();
+        return back()->with('success', "{$deleted} contacts deleted successfully!");
+    }
 
-        return back()->with('success', "{$deleted} contact(s) deleted successfully!");
+    /**
+     * Toggle contact status
+     */
+    public function toggleStatus(ContactList $contactList, Contact $contact)
+    {
+        // Check authorization
+        if ($contactList->user_id !== auth()->id() || $contact->contact_list_id !== $contactList->id) {
+            abort(403);
+        }
+
+        $contact->update(['is_active' => !$contact->is_active]);
+
+        return response()->json([
+            'success' => true,
+            'is_active' => $contact->is_active,
+            'message' => 'Contact status updated successfully!',
+        ]);
     }
 }
+

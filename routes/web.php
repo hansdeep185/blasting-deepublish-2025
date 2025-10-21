@@ -89,6 +89,13 @@ Route::middleware(['auth', 'role:user'])->group(function () {
         Route::delete('/contacts/{contact}', [App\Http\Controllers\ContactController::class, 'destroy'])->name('contacts.destroy');
     });
 
+    Route::resource('templates', App\Http\Controllers\TemplateController::class);
+        Route::post('/templates/{template}/duplicate', [App\Http\Controllers\TemplateController::class, 'duplicate'])
+            ->name('templates.duplicate');
+        Route::post('/templates/{template}/toggle-status', [App\Http\Controllers\TemplateController::class, 'toggleStatus'])
+            ->name('templates.toggle-status');
+        Route::post('/templates/{template}/preview', [App\Http\Controllers\TemplateController::class, 'preview'])
+            ->name('templates.preview');
 });
 
 // Admin routes
@@ -108,9 +115,17 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
     Route::post('/settings', [SettingController::class, 'update'])->name('settings.update');
     Route::post('/settings/test-waha', [SettingController::class, 'testWaha'])->name('settings.test-waha');
     Route::post('/settings/test-n8n', [SettingController::class, 'testN8n'])->name('settings.test-n8n');
+
+    // Admin - All Accounts Management
+    Route::prefix('accounts')->name('accounts.')->group(function () {
+        Route::get('/', [App\Http\Controllers\Admin\AccountController::class, 'index'])->name('index');
+        Route::get('/{account}', [App\Http\Controllers\Admin\AccountController::class, 'show'])->name('show');
+        Route::post('/{account}/force-disconnect', [App\Http\Controllers\Admin\AccountController::class, 'forceDisconnect'])->name('force-disconnect');
+        Route::delete('/{account}', [App\Http\Controllers\Admin\AccountController::class, 'destroy'])->name('destroy');
+    });
     
     // Placeholder routes - akan diimplementasikan di fase selanjutnya
-    Route::get('/accounts', fn() => view('under-construction'))->name('accounts.index');
+    //Route::get('/accounts', fn() => view('under-construction'))->name('accounts.index');
     Route::get('/audit-logs', fn() => view('under-construction'))->name('audit-logs.index');
     Route::get('/monitor', fn() => view('under-construction'))->name('monitor.index');
 
