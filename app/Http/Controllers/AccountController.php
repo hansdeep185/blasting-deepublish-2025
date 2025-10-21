@@ -48,12 +48,30 @@ class AccountController extends Controller
      */
     public function store(Request $request)
     {
+        // 1. Validasi input dasar
         $request->validate([
-            'session_name' => 'required|string|max:255|unique:accounts,session_name',
+            'session_name' => 'required|string|max:255',
+            // Kita hapus 'unique' dari sini karena akan kita cek manual
         ]);
 
-        // Generate unique session name
-        $sessionName = Str::slug($request->session_name) . '_' . auth()->id() . '_' . time();
+        // 2. Buat nama sesi yang aman (slug) DARI INPUT USER
+        // Ini mengubah "Sesi Budi" -> "sesi-budi"
+        $sessionName = Str::slug($request->session_name);
+
+        // 3. TANGANI NAMA YANG SAMA (DUPLIKAT)
+        // Cek apakah slug ini sudah ada di database
+        $isDuplicate = Account::where('session_name', $sessionName)->exists();
+
+        if ($isDuplicate) {
+            // Jika sudah ada, kembalikan user ke form dengan pesan error
+            return back()
+                ->withInput() // Mengembalikan input sebelumnya (agar form tidak kosong)
+                ->with('error', 'Nama session sudah digunakan, pakai yang lain!');
+                // Kamu bisa juga menggunakan error validasi:
+                // ->withErrors(['session_name' => 'Session name already exists.']);
+        }
+
+        // --- Jika lolos (tidak duplikat), lanjutkan proses ---
 
         // STEP 1: Create session in WAHA
         $result = $this->wahaService->createSession($sessionName);
@@ -74,9 +92,9 @@ class AccountController extends Controller
         // STEP 3: Create account in database
         $account = Account::create([
             'user_id' => auth()->id(),
-            'session_name' => $sessionName,
+            'session_name' => $sessionName, // Simpan nama yang aman (slug)
             'status' => 'pending',
-            'waha_session_id' => $sessionName,
+            'waha_session_id' => $sessionName, // Gunakan nama yang sama untuk waha_id
         ]);
 
         AuditLog::logActivity(
