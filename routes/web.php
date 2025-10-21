@@ -44,6 +44,19 @@ Route::middleware(['auth', 'role:user'])->group(function () {
         ->name('accounts.reconnect');
     Route::post('/accounts/{account}/toggle-ai', [App\Http\Controllers\AccountController::class, 'toggleAi'])
         ->name('accounts.toggle-ai');
+    // Contact Lists
+    Route::resource('contact-lists', App\Http\Controllers\ContactListController::class);
+    /*
+    // Contacts
+    Route::prefix('contact-lists/{contactList}')->name('contacts.')->group(function () {
+        Route::get('/contacts', [App\Http\Controllers\ContactController::class, 'index'])->name('index');
+        Route::get('/contacts/create', [App\Http\Controllers\ContactController::class, 'create'])->name('create');
+        Route::post('/contacts', [App\Http\Controllers\ContactController::class, 'store'])->name('store');
+        Route::post('/contacts/import', [App\Http\Controllers\ContactController::class, 'import'])->name('import');
+        Route::get('/contacts/{contact}/edit', [App\Http\Controllers\ContactController::class, 'edit'])->name('edit');
+        Route::put('/contacts/{contact}', [App\Http\Controllers\ContactController::class, 'update'])->name('update');
+        Route::delete('/contacts/{contact}', [App\Http\Controllers\ContactController::class, 'destroy'])->name('destroy');
+    });
     
     // Placeholder routes - akan diimplementasikan di fase selanjutnya
     Route::get('/contact-lists', fn() => view('under-construction'))->name('contact-lists.index');
@@ -53,6 +66,29 @@ Route::middleware(['auth', 'role:user'])->group(function () {
     Route::get('/chats', fn() => view('under-construction'))->name('chats.index');
     Route::get('/chats/{account}', fn() => view('under-construction'))->name('chats.show');
     Route::get('/training', fn() => view('under-construction'))->name('training.index');
+    */
+    Route::prefix('contact-lists/{contactList}')->group(function () {
+        
+        // Contact Tags
+        Route::get('/tags', [App\Http\Controllers\ContactTagController::class, 'index'])->name('contact-tags.index');
+        Route::post('/tags', [App\Http\Controllers\ContactTagController::class, 'store'])->name('contact-tags.store');
+        Route::put('/tags/{contactTag}', [App\Http\Controllers\ContactTagController::class, 'update'])->name('contact-tags.update');
+        Route::delete('/tags/{contactTag}', [App\Http\Controllers\ContactTagController::class, 'destroy'])->name('contact-tags.destroy');
+        Route::post('/bulk-tag', [App\Http\Controllers\ContactTagController::class, 'bulkTag'])->name('contact-tags.bulk-tag');
+        
+        // Contacts - update yang sudah ada
+        Route::get('/contacts', [App\Http\Controllers\ContactController::class, 'index'])->name('contacts.index');
+        Route::get('/contacts/create', [App\Http\Controllers\ContactController::class, 'create'])->name('contacts.create');
+        Route::post('/contacts', [App\Http\Controllers\ContactController::class, 'store'])->name('contacts.store');
+        Route::get('/contacts/import-form', [App\Http\Controllers\ContactController::class, 'importForm'])->name('contacts.import.form');
+        Route::post('/contacts/import', [App\Http\Controllers\ContactController::class, 'import'])->name('contacts.import');
+        Route::get('/contacts/download-template', [App\Http\Controllers\ContactController::class, 'downloadTemplate'])->name('contacts.template');
+        Route::post('/contacts/bulk-delete', [App\Http\Controllers\ContactController::class, 'bulkDelete'])->name('contacts.bulk-delete');
+        Route::get('/contacts/{contact}/edit', [App\Http\Controllers\ContactController::class, 'edit'])->name('contacts.edit');
+        Route::put('/contacts/{contact}', [App\Http\Controllers\ContactController::class, 'update'])->name('contacts.update');
+        Route::delete('/contacts/{contact}', [App\Http\Controllers\ContactController::class, 'destroy'])->name('contacts.destroy');
+    });
+
 });
 
 // Admin routes

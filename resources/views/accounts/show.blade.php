@@ -193,11 +193,13 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <a href="{{ route('chats.show', $account) }}" class="btn btn-outline-primary">
+                    <a href="{{ url('/chats/' . $account->id) }}" class="btn btn-outline-primary">
                         <i class="bi bi-chat-dots"></i> Open Chat
+                        <span class="badge bg-secondary ms-2">Soon</span>
                     </a>
-                    <a href="{{ route('blasts.create') }}?account={{ $account->id }}" class="btn btn-outline-success">
+                    <a href="{{ url('/blasts/create?account=' . $account->id) }}" class="btn btn-outline-success">
                         <i class="bi bi-send"></i> Create Blast
+                        <span class="badge bg-secondary ms-2">Soon</span>
                     </a>
                     <button class="btn btn-outline-info" onclick="checkStatus()">
                         <i class="bi bi-arrow-clockwise"></i> Check Status

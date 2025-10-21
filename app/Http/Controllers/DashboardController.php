@@ -55,6 +55,35 @@ class DashboardController extends Controller
             ->latest()
             ->get();
 
-        return view('dashboard', compact('stats', 'recentBlasts', 'blastStats', 'accounts'));
+        // Map variable names untuk compatibility dengan dashboard view
+        $totalAccounts = $stats['total_accounts'];
+        $connectedAccounts = $stats['connected_accounts'];
+        $totalContacts = $stats['total_contacts'];
+        $totalContactLists = $stats['total_lists'];
+        $remainingQuota = $stats['quota_remaining'];
+        
+        $totalBlasts = $blastStats['total'];
+        $scheduledBlasts = $blastStats['scheduled'];
+        $processingBlasts = $blastStats['processing'];
+        $completedBlasts = $blastStats['completed'];
+        $failedBlasts = $blastStats['failed'];
+
+        return view('dashboard', compact(
+            'stats', 
+            'recentBlasts', 
+            'blastStats', 
+            'accounts',
+            // Additional variables for dashboard view
+            'totalAccounts',
+            'connectedAccounts',
+            'totalContacts',
+            'totalContactLists',
+            'remainingQuota',
+            'totalBlasts',
+            'scheduledBlasts',
+            'processingBlasts',
+            'completedBlasts',
+            'failedBlasts'
+        ));
     }
 }
