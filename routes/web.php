@@ -96,6 +96,17 @@ Route::middleware(['auth', 'role:user'])->group(function () {
             ->name('templates.toggle-status');
         Route::post('/templates/{template}/preview', [App\Http\Controllers\TemplateController::class, 'preview'])
             ->name('templates.preview');
+    
+    // Blast Campaigns
+    Route::prefix('blasts')->name('blasts.')->group(function () {
+        Route::get('/', [App\Http\Controllers\BlastScheduleController::class, 'index'])->name('index');
+        Route::get('/create', [App\Http\Controllers\BlastScheduleController::class, 'create'])->name('create');
+        Route::post('/', [App\Http\Controllers\BlastScheduleController::class, 'store'])->name('store');
+        Route::get('/{blast}', [App\Http\Controllers\BlastScheduleController::class, 'show'])->name('show');
+        Route::post('/{blast}/cancel', [App\Http\Controllers\BlastScheduleController::class, 'cancel'])->name('cancel');
+        Route::get('/{blast}/report', [App\Http\Controllers\BlastScheduleController::class, 'report'])->name('report');
+        Route::post('/preview', [App\Http\Controllers\BlastScheduleController::class, 'preview'])->name('preview');
+    });
 });
 
 // Admin routes

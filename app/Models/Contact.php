@@ -145,4 +145,31 @@ class Contact extends Model
     {
         $this->update(['opted_out_at' => null]);
     }
+
+    // =========================================================================
+    // AWAL PERBAIKAN: Menambahkan method getTemplateData() yang hilang
+    // =========================================================================
+    /**
+     * Get the data from this contact to be used in a template.
+     *
+     * @return array
+     */
+    public function getTemplateData(): array
+    {
+        // Data dasar kontak
+        $data = [
+            'name' => $this->name,
+            'phone' => $this->phone_number, // Menggunakan kolom 'phone_number'
+            'email' => $this->email,
+        ];
+
+        // Menggabungkan dengan custom_fields, jika ada.
+        // Ini memungkinkan penggunaan variabel seperti {{ order_id }} atau {{ alamat }}
+        // jika data tersebut disimpan di dalam custom_fields.
+        return array_merge($data, $this->custom_fields ?? []);
+    }
+    // =========================================================================
+    // AKHIR PERBAIKAN
+    // =========================================================================
 }
+
