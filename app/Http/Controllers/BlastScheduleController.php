@@ -77,13 +77,13 @@ class BlastScheduleController extends Controller
             ->get();
 
         // Get tags (groups)
-        $tags = ContactTag::whereHas('contactLists', function($q) {
+        $contactTags = ContactTag::whereHas('contactList', function($q) {
             $q->where('user_id', auth()->id());
         })
         ->withCount('contacts')
         ->get();
 
-        return view('blasts.create', compact('accounts', 'templates', 'contactLists', 'tags'));
+        return view('blasts.create', compact('accounts', 'templates', 'contactLists', 'contactTags'));
     }
 
     /**

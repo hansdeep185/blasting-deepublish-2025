@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\SettingController;
 use Illuminate\Support\Facades\Route;
 
+
 // Guest routes
 Route::middleware('guest')->group(function () {
     Route::get('/', function () {
@@ -39,7 +40,7 @@ Route::middleware(['auth', 'role:user'])->group(function () {
         ->name('dashboard');
     
     // Account Management
-    Route::resource('accounts', App\Http\Controllers\AccountController::class);
+    Route::resource('accounts', App\Http\Controllers\AccountController::class)->where(['account' => '[0-9]+']);
     Route::post('/accounts/{account}/reconnect', [App\Http\Controllers\AccountController::class, 'reconnect'])
         ->name('accounts.reconnect');
     Route::post('/accounts/{account}/toggle-ai', [App\Http\Controllers\AccountController::class, 'toggleAi'])
@@ -106,6 +107,20 @@ Route::middleware(['auth', 'role:user'])->group(function () {
         Route::post('/{blast}/cancel', [App\Http\Controllers\BlastScheduleController::class, 'cancel'])->name('cancel');
         Route::get('/{blast}/report', [App\Http\Controllers\BlastScheduleController::class, 'report'])->name('report');
         Route::post('/preview', [App\Http\Controllers\BlastScheduleController::class, 'preview'])->name('preview');
+    });
+
+    Route::prefix('chats')->name('chats.')->group(function () {
+        Route::get('/', [App\Http\Controllers\ChatController::class, 'index'])->name('index');
+        Route::get('/{chat}/messages/sync', [App\Http\Controllers\ChatController::class, 'syncMessages'])->name('messages.sync');
+        Route::get('/{account}', [App\Http\Controllers\ChatController::class, 'show'])->name('show');
+        Route::get('/{account}/{chat}', [App\Http\Controllers\ChatController::class, 'show'])->name('conversation');
+        Route::post('/{account}/send', [App\Http\Controllers\ChatController::class, 'send'])->name('send');
+        Route::get('/{chat}/messages', [App\Http\Controllers\ChatController::class, 'loadMessages'])->name('messages');
+        
+        Route::get('/{chat}/messages/new', [App\Http\Controllers\ChatController::class, 'getNewMessages'])->name('messages.new'); // 👈 TAMBAHKAN INI
+        Route::post('/{chat}/archive', [App\Http\Controllers\ChatController::class, 'archive'])->name('archive');
+        Route::post('/{chat}/unarchive', [App\Http\Controllers\ChatController::class, 'unarchive'])->name('unarchive');
+        Route::delete('/{chat}', [App\Http\Controllers\ChatController::class, 'destroy'])->name('destroy');
     });
 });
 

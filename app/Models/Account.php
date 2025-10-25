@@ -43,6 +43,17 @@ class Account extends Model
         return $this->hasMany(BlastSchedule::class);
     }
 
+    // Chat Relations
+    public function chats()
+    {
+        return $this->hasMany(Chat::class);
+    }
+
+    public function messages()
+    {
+        return $this->hasMany(ChatMessage::class);
+    }
+
     public function isConnected(): bool
     {
         return $this->status === 'connected';
@@ -78,5 +89,16 @@ class Account extends Model
         $this->save();
         
         return $this->ai_agent_active;
+    }
+
+    // Chat Helper Methods
+    public function getTotalChatsAttribute(): int
+    {
+        return $this->chats()->count();
+    }
+
+    public function getUnreadChatsAttribute(): int
+    {
+        return $this->chats()->where('unread_count', '>', 0)->count();
     }
 }

@@ -75,9 +75,9 @@
                         </a>
                     </li>
                     <li class="nav-item mb-2">
-                        <a href="#" class="nav-link text-white-50" style="opacity: 0.6; cursor: not-allowed;">
+                        <a href="{{ route('chats.index') }}" 
+                            class="nav-link text-white {{ request()->routeIs('chats.*') ? 'active bg-white bg-opacity-25 rounded' : '' }}">
                             <i class="bi bi-chat-dots me-2"></i> Chat UI
-                            <span class="badge bg-secondary ms-2" style="font-size: 0.65rem;">Soon</span>
                         </a>
                     </li>
                     <li class="nav-item mb-2">

@@ -112,7 +112,7 @@
                     </div>
 
                     <div class="qr-code-container mb-4">
-                        <img src="{{ $qrCode }}" alt="QR Code" class="img-fluid" style="max-width: 300px;">
+                        <img src="{!! $qrCode !!}" alt="QR Code" class="img-fluid" style="max-width: 300px;">
                     </div>
 
                     <div class="steps">

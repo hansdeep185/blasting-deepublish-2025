@@ -117,7 +117,7 @@
                                 <div id="contact_group_div" class="mt-3" style="display: none;">
                                     <label class="form-label small">Select Groups (Tags)</label>
                                     <select class="form-select" name="target_ids[]" multiple size="5">
-                                        @foreach($tags as $tag)
+                                        @foreach($contactTags as $tag)
                                             <option value="{{ $tag->id }}" {{ in_array($tag->id, old('target_ids', [])) ? 'selected' : '' }}>
                                                 {{ $tag->name }} ({{ $tag->contacts_count }} contacts)
                                             </option>
