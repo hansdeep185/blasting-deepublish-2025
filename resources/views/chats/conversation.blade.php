@@ -18,16 +18,36 @@
                 <a href="{{ route('chats.conversation', ['account' => $account->id, 'chat' => $c->id]) }}" 
                    class="d-block text-decoration-none text-dark border-bottom chat-item {{ $chat && $chat->id == $c->id ? 'active' : '' }}">
                     <div class="p-3 d-flex align-items-start">
-                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" 
-                             style="width: 45px; height: 45px;">
-                            <strong class="small">{{ $c->initials }}</strong>
-                        </div>
+                        @if($c->hasPicture())
+                            <img src="{{ $c->picture_url }}" 
+                                 class="rounded-circle me-3" 
+                                 style="width: 45px; height: 45px; object-fit: cover;"
+                                 alt="{{ $c->display_name }}"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="rounded-circle bg-primary text-white align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px; display: none;">
+                                <strong class="small">{{ $c->initials }}</strong>
+                            </div>
+                        @else
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" 
+                                 style="width: 45px; height: 45px;">
+                                <strong class="small">{{ $c->initials }}</strong>
+                            </div>
+                        @endif
+                        
                         <div class="flex-grow-1 overflow-hidden">
                             <div class="d-flex justify-content-between mb-1">
                                 <h6 class="mb-0 small text-truncate">{{ $c->display_name }}</h6>
                                 <small class="text-muted">{{ $c->last_message_at?->format('H:i') }}</small>
                             </div>
-                            <small class="text-muted text-truncate d-block">{{ Str::limit($c->last_message, 30) }}</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted text-truncate" style="max-width: 150px;">
+                                    {{ Str::limit($c->last_message, 30) }}
+                                </small>
+                                @if($c->unread_count > 0)
+                                <span class="badge bg-success rounded-pill">{{ $c->unread_count }}</span>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 </a>
@@ -43,10 +63,24 @@
                     <a href="{{ route('chats.index', ['account_id' => $account->id]) }}" class="btn btn-sm btn-light me-3 d-md-none">
                         <i class="bi bi-arrow-left"></i>
                     </a>
-                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" 
-                         style="width: 45px; height: 45px;">
-                        <strong>{{ $chat->initials }}</strong>
-                    </div>
+                    
+                    @if($chat->hasPicture())
+                        <img src="{{ $chat->picture_url }}" 
+                             class="rounded-circle me-3" 
+                             style="width: 45px; height: 45px; object-fit: cover;"
+                             alt="{{ $chat->display_name }}"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="rounded-circle bg-primary text-white align-items-center justify-content-center me-3" 
+                             style="width: 45px; height: 45px; display: none;">
+                            <strong>{{ $chat->initials }}</strong>
+                        </div>
+                    @else
+                        <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-3" 
+                             style="width: 45px; height: 45px;">
+                            <strong>{{ $chat->initials }}</strong>
+                        </div>
+                    @endif
+                    
                     <div class="flex-grow-1">
                         <h6 class="mb-0">{{ $chat->display_name }}</h6>
                         <small class="text-muted">{{ $chat->contact_phone }}</small>
@@ -56,6 +90,12 @@
                             <i class="bi bi-three-dots-vertical"></i>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <button class="dropdown-item" onclick="refreshChatPicture({{ $chat->id }})">
+                                    <i class="bi bi-arrow-clockwise me-2"></i>Refresh Picture
+                                </button>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
                             <li>
                                 <button class="dropdown-item" onclick="archiveChat({{ $chat->id }})">
                                     <i class="bi bi-archive me-2"></i>Archive Chat
@@ -71,7 +111,7 @@
                     </div>
                 </div>
 
-                <!-- Messages Area -->
+                <!-- 🔥 ADDED: Messages Area -->
                 <div id="messagesArea" class="flex-grow-1 p-3" 
                      style="overflow-y: auto; 
                             overflow-x: hidden;
@@ -89,7 +129,7 @@
                     </div>
                 </div>
 
-                <!-- Message Input -->
+                <!-- 🔥 ADDED: Message Input -->
                 <div class="p-3 border-top bg-white" style="flex-shrink: 0;">
                     <form id="messageForm" action="{{ route('chats.send', $account->id) }}" method="POST">
                         @csrf
@@ -133,8 +173,10 @@
         </div>
     </div>
 </div>
+@endsection
 
 @if($chat)
+@push('scripts')
 <script>
 const accountId = {{ $account->id }};
 const chatId = {{ $chat->id }};
@@ -181,18 +223,9 @@ messageForm.addEventListener('submit', async function(e) {
         const data = await response.json();
         
         if (data.success) {
-            // Clear input
             messageInput.value = '';
-            
-            // Add message to UI
             appendMessage(data.message);
-            
-            // Update lastMessageId for polling
-            if (typeof lastMessageId !== 'undefined') {
-                lastMessageId = data.message.id;
-            }
-            
-            // Scroll to bottom
+            lastMessageId = data.message.id;
             setTimeout(scrollToBottom, 100);
         } else {
             console.error('Error:', data.error);
@@ -202,7 +235,6 @@ messageForm.addEventListener('submit', async function(e) {
         console.error('Error:', error);
         alert('Failed to send message. Please try again.');
     } finally {
-        // Re-enable input
         sendBtn.disabled = false;
         messageInput.disabled = false;
         messageInput.focus();
@@ -255,6 +287,35 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Refresh chat picture
+async function refreshChatPicture(chatId) {
+    try {
+        const response = await fetch(`/chats/${chatId}/picture/refresh?force=true`, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            window.location.reload();
+        } else {
+            // Show informative message if NOWEB is required
+            if (data.error && data.error.includes('NOWEB')) {
+                alert('Picture refresh requires WAHA NOWEB configuration. Feature not available.');
+            } else {
+                alert('Failed to refresh picture');
+            }
+        }
+    } catch (error) {
+        console.error('Error refreshing picture:', error);
+        alert('An error occurred');
+    }
+}
+
 // Archive chat
 async function archiveChat(chatId) {
     if (!confirm('Archive this chat?')) return;
@@ -297,25 +358,22 @@ async function deleteChat(chatId) {
     }
 }
 
-// Polling untuk sync messages dari WAHA setiap 5 detik
+// 🔥 OPTIMIZED: Fast polling untuk real-time messages
+// Messages sudah di-save oleh webhook, kita hanya perlu polling dari database
 let lastMessageId = {{ $chat->messages()->latest()->first()->id ?? 0 }};
-let isSyncing = false; // Flag to prevent multiple syncs
-let syncInterval;
+let isPolling = false;
+let pollingAttempts = 0;
+let maxPollingAttempts = 5;
 
-console.log('Starting WAHA sync with lastMessageId:', lastMessageId);
+console.log('🚀 Starting real-time message polling with lastMessageId:', lastMessageId);
 
-// Function to sync messages
-async function syncWahaMessages() {
-    if (isSyncing) {
-        console.log('Sync already in progress. Skipping.');
-        return;
-    }
+async function checkNewMessages() {
+    if (isPolling) return;
     
-    isSyncing = true;
-    console.log('Running sync...');
+    isPolling = true;
 
     try {
-        const response = await fetch(`/chats/${chatId}/messages/sync`, {
+        const response = await fetch(`/chats/${chatId}/messages/new?after=${lastMessageId}`, {
             headers: {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -325,36 +383,58 @@ async function syncWahaMessages() {
         if (response.ok) {
             const data = await response.json();
             
-            console.log('Sync response:', data);
-            
             if (data.success && data.messages && data.messages.length > 0) {
-                console.log('New messages from WAHA:', data.count);
+                console.log('✅ New messages received:', data.messages.length);
                 
+                // Add each new message to UI
                 data.messages.forEach(message => {
                     appendMessage(message);
                     lastMessageId = message.id;
                 });
                 
+                // Auto scroll
                 setTimeout(scrollToBottom, 100);
+                
+                // Reset polling attempts on success
+                pollingAttempts = 0;
             }
         } else {
-            console.error('Sync failed with status:', response.status);
+            pollingAttempts++;
+            console.warn(`⚠️ Polling failed (attempt ${pollingAttempts}/${maxPollingAttempts})`);
+            
+            // Stop polling after max attempts
+            if (pollingAttempts >= maxPollingAttempts) {
+                console.error('❌ Max polling attempts reached. Stopping.');
+                clearInterval(pollingInterval);
+            }
         }
     } catch (error) {
-        console.error('Error syncing messages:', error);
-        // Stop polling if there's a persistent network error
-        if (syncInterval) {
-            clearInterval(syncInterval);
-            console.error('Polling stopped due to network error.');
+        pollingAttempts++;
+        console.error(`❌ Polling error (attempt ${pollingAttempts}/${maxPollingAttempts}):`, error);
+        
+        if (pollingAttempts >= maxPollingAttempts) {
+            console.error('❌ Max polling attempts reached. Stopping.');
+            clearInterval(pollingInterval);
         }
     } finally {
-        isSyncing = false;
+        isPolling = false;
     }
 }
 
-// Start polling
-syncInterval = setInterval(syncWahaMessages, 8000); // Sync every 8 seconds
+// 🔥 Poll setiap 2 detik untuk real-time experience
+// Webhook sudah save ke database, polling ini sangat ringan
+const pollingInterval = setInterval(checkNewMessages, 2000);
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', function() {
+    if (pollingInterval) {
+        clearInterval(pollingInterval);
+    }
+});
+
+console.log('✅ Real-time polling started (every 2 seconds)');
 </script>
+@endpush
 @endif
 
 <style>
@@ -386,5 +466,13 @@ syncInterval = setInterval(syncWahaMessages, 8000); // Sync every 8 seconds
     flex-direction: column;
     gap: 0;
 }
+
+/* Image avatar styles */
+.rounded-circle img {
+    border: 2px solid #e0e0e0;
+}
+
+.chat-item.active .rounded-circle img {
+    border-color: #4caf50;
+}
 </style>
-@endsection

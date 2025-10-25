@@ -6,26 +6,28 @@ use App\Models\Account;
 use App\Models\Chat;
 use App\Models\ChatMessage;
 use App\Services\MessageService;
-use App\Services\MessageSyncService;
+use App\Services\ChatSyncService;
 use Illuminate\Http\Request;
 
 class ChatController extends Controller
 {
     protected MessageService $messageService;
-    protected MessageSyncService $syncService;
+    protected ChatSyncService $chatSyncService;
 
-    public function __construct(MessageService $messageService, MessageSyncService $syncService)
-    {
-        $this->messageService = $messageService;
-        $this->syncService = $syncService;
-    }
+
+    public function __construct(
+        MessageService $messageService, 
+        ChatSyncService $chatSyncService
+        ){
+            $this->messageService = $messageService;
+            $this->chatSyncService = $chatSyncService;
+        }
 
     /**
      * Display chat list
      */
-    public function index(Request $request)
+     public function index(Request $request)
     {
-        // Get user's accounts
         $accounts = Account::where('user_id', auth()->id())
             ->where('status', 'connected')
             ->get();
@@ -36,21 +38,25 @@ class ChatController extends Controller
                 ->with('error', 'Please connect a WhatsApp account first!');
         }
 
-        // Default to first account
         $selectedAccount = $request->account_id 
             ? Account::findOrFail($request->account_id)
             : $accounts->first();
 
-        // Check ownership
         if ($selectedAccount->user_id !== auth()->id()) {
             abort(403);
         }
 
-        // Get chats for selected account
+        // 🔥 RESTORED: Auto-sync (akan berfungsi setelah NOWEB enabled)
+        try {
+            $this->chatSyncService->syncChatsFromWaha($selectedAccount, 50);
+        } catch (\Exception $e) {
+            // Silent fail - tidak mengganggu loading halaman
+            Log::debug('Chat sync skipped', ['error' => $e->getMessage()]);
+        }
+
         $query = Chat::where('account_id', $selectedAccount->id)
             ->with('latestMessage');
 
-        // Filter
         if ($request->filled('filter')) {
             if ($request->filter === 'unread') {
                 $query->withUnread();
@@ -63,7 +69,6 @@ class ChatController extends Controller
             $query->active();
         }
 
-        // Search
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
@@ -79,74 +84,108 @@ class ChatController extends Controller
         return view('chats.index', compact('accounts', 'selectedAccount', 'chats'));
     }
 
-    /**
-     * Sync and get new messages from WAHA
-     */
-    public function syncMessages(Chat $chat, Request $request)
+    public function syncChats(Request $request)
     {
-        // Check ownership
-        if ($chat->account->user_id !== auth()->id()) {
-            return response()->json(['error' => 'Forbidden'], 403);
+        $accountId = $request->account_id ?? auth()->user()->accounts()->first()?->id;
+        
+        if (!$accountId) {
+            return response()->json([
+                'success' => false,
+                'error' => 'No account found',
+            ], 404);
+        }
+
+        $account = Account::findOrFail($accountId);
+
+        if ($account->user_id !== auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Forbidden',
+            ], 403);
         }
 
         try {
-            $result = $this->syncService->syncChatMessages($chat, 50);
+            $result = $this->chatSyncService->syncChatsFromWaha($account, 100);
 
             if ($result['success']) {
-                return response()->json($result);
+                return response()->json([
+                    'success' => true,
+                    'message' => "Synced {$result['synced']} new chats and updated {$result['updated']} existing chats",
+                    'data' => $result,
+                ]);
+            }
+
+            // Better error message for NOWEB requirement
+            $errorMsg = $result['error'] ?? 'Failed to sync chats';
+            if (str_contains($errorMsg, 'NOWEB') || str_contains($errorMsg, '400')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'NOWEB store not enabled. Run: php artisan waha:enable-noweb --all',
+                    'hint' => 'This will enable NOWEB store for all sessions to fix 400 errors',
+                ], 400);
             }
 
             return response()->json([
                 'success' => false,
-                'error' => $result['error'] ?? 'Failed to sync messages',
+                'error' => $errorMsg,
             ], 500);
 
         } catch (\Exception $e) {
-            Log::error('SyncMessages controller error', [
-                'chat_id' => $chat->id,
-                'error' => $e->getMessage()
+            Log::error('Sync chats error', [
+                'error' => $e->getMessage(),
+                'account_id' => $accountId,
             ]);
+
             return response()->json([
                 'success' => false,
-                'error' => 'An unexpected server error occurred.'
+                'error' => 'An unexpected error occurred',
             ], 500);
         }
     }
 
-    /**
-     * Display chat conversation
-     */
+
     public function show(Request $request, Account $account, $chatId = null)
     {
-        // Check account ownership
         if ($account->user_id !== auth()->id()) {
             abort(403);
         }
 
-        // Get or create chat if phone provided
-        if ($request->filled('phone')) {
-            $chat = Chat::getOrCreate($account->id, $request->phone, $request->name);
-            return redirect()->route('chats.show', ['account' => $account->id, 'chat' => $chat->id]);
+        // 🔥 RESTORED: Auto-sync on page load
+        try {
+            $this->chatSyncService->syncChatsFromWaha($account, 30);
+        } catch (\Exception $e) {
+            Log::debug('Chat sync skipped on conversation load', [
+                'error' => $e->getMessage(),
+            ]);
         }
 
-        // Load specific chat
+        if ($request->filled('phone')) {
+            $chat = Chat::getOrCreate($account->id, $request->phone, $request->name);
+            return redirect()->route('chats.conversation', ['account' => $account->id, 'chat' => $chat->id]);
+        }
+
         if ($chatId) {
             $chat = Chat::with(['messages' => function($query) {
                 $query->latest()->limit(50);
             }])->findOrFail($chatId);
 
-            // Check ownership
             if ($chat->account_id !== $account->id) {
                 abort(403);
             }
 
-            // Mark as read
+            // 🔥 RESTORED: Mark as read di WAHA (jika NOWEB enabled)
+            try {
+                $this->chatSyncService->markChatAsRead($chat);
+            } catch (\Exception $e) {
+                Log::debug('Mark as read skipped', ['error' => $e->getMessage()]);
+            }
+
+            // Always mark as read locally
             $chat->markAsRead();
 
             return view('chats.conversation', compact('account', 'chat'));
         }
 
-        // No chat selected, show empty state
         return view('chats.conversation', compact('account'))->with('chat', null);
     }
 
@@ -155,7 +194,6 @@ class ChatController extends Controller
      */
     public function send(Request $request, Account $account)
     {
-        // Check account ownership
         if ($account->user_id !== auth()->id()) {
             return response()->json(['success' => false, 'error' => 'Forbidden'], 403);
         }
@@ -167,36 +205,31 @@ class ChatController extends Controller
 
         $chat = Chat::findOrFail($validated['chat_id']);
 
-        // Check chat belongs to account
         if ($chat->account_id !== $account->id) {
             return response()->json(['success' => false, 'error' => 'Forbidden'], 403);
         }
 
         try {
-            // Send message via MessageService
             $result = $this->messageService->sendText($account, $chat, $validated['message']);
 
             if ($result['success']) {
-                // Return JSON response on success
                 return response()->json([
                     'success' => true,
                     'message' => $result['message'],
                 ]);
             }
 
-            // Return JSON response on failure
             return response()->json([
                 'success' => false,
                 'error' => $result['error'] ?? 'Failed to send message',
             ], 500);
 
         } catch (\Exception $e) {
-            \Log::error('Chat send error', [
+            Log::error('Chat send error', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            // Return JSON response on exception
             return response()->json([
                 'success' => false,
                 'error' => 'Failed to send message: ' . $e->getMessage(),
@@ -209,7 +242,6 @@ class ChatController extends Controller
      */
     public function loadMessages(Chat $chat, Request $request)
     {
-        // Check ownership
         if ($chat->account->user_id !== auth()->id()) {
             abort(403);
         }
@@ -287,7 +319,6 @@ class ChatController extends Controller
      */
     public function getNewMessages(Chat $chat, Request $request)
     {
-        // Check ownership
         if ($chat->account->user_id !== auth()->id()) {
             abort(403);
         }
@@ -302,6 +333,48 @@ class ChatController extends Controller
         return response()->json([
             'success' => true,
             'messages' => $messages,
+            'count' => $messages->count(),
         ]);
+    }
+    /**
+     * 🔥 METHOD BARU: Refresh chat picture
+     */
+    public function refreshPicture(Chat $chat, Request $request)
+    {
+        if ($chat->account->user_id !== auth()->id()) {
+            abort(403);
+        }
+
+        try {
+            $forceRefresh = $request->boolean('force', false);
+            
+            $result = $this->chatSyncService->refreshChatPicture($chat, $forceRefresh);
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'picture_url' => $result['url'],
+                ]);
+            }
+
+            $errorMsg = $result['error'] ?? 'Failed to refresh picture';
+            if (str_contains($errorMsg, 'NOWEB') || str_contains($errorMsg, '400')) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'NOWEB store not enabled. Run: php artisan waha:enable-noweb --all',
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => false,
+                'error' => $errorMsg,
+            ], 500);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }

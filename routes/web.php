@@ -47,27 +47,7 @@ Route::middleware(['auth', 'role:user'])->group(function () {
         ->name('accounts.toggle-ai');
     // Contact Lists
     Route::resource('contact-lists', App\Http\Controllers\ContactListController::class);
-    /*
-    // Contacts
-    Route::prefix('contact-lists/{contactList}')->name('contacts.')->group(function () {
-        Route::get('/contacts', [App\Http\Controllers\ContactController::class, 'index'])->name('index');
-        Route::get('/contacts/create', [App\Http\Controllers\ContactController::class, 'create'])->name('create');
-        Route::post('/contacts', [App\Http\Controllers\ContactController::class, 'store'])->name('store');
-        Route::post('/contacts/import', [App\Http\Controllers\ContactController::class, 'import'])->name('import');
-        Route::get('/contacts/{contact}/edit', [App\Http\Controllers\ContactController::class, 'edit'])->name('edit');
-        Route::put('/contacts/{contact}', [App\Http\Controllers\ContactController::class, 'update'])->name('update');
-        Route::delete('/contacts/{contact}', [App\Http\Controllers\ContactController::class, 'destroy'])->name('destroy');
-    });
     
-    // Placeholder routes - akan diimplementasikan di fase selanjutnya
-    Route::get('/contact-lists', fn() => view('under-construction'))->name('contact-lists.index');
-    Route::get('/templates', fn() => view('under-construction'))->name('templates.index');
-    Route::get('/blasts', fn() => view('under-construction'))->name('blasts.index');
-    Route::get('/blasts/create', fn() => view('under-construction'))->name('blasts.create');
-    Route::get('/chats', fn() => view('under-construction'))->name('chats.index');
-    Route::get('/chats/{account}', fn() => view('under-construction'))->name('chats.show');
-    Route::get('/training', fn() => view('under-construction'))->name('training.index');
-    */
     Route::prefix('contact-lists/{contactList}')->group(function () {
         
         // Contact Tags
@@ -109,19 +89,38 @@ Route::middleware(['auth', 'role:user'])->group(function () {
         Route::post('/preview', [App\Http\Controllers\BlastScheduleController::class, 'preview'])->name('preview');
     });
 
-    Route::prefix('chats')->name('chats.')->group(function () {
+    Route::prefix('chats')->name('chats.')->middleware(['auth', 'role:user'])->group(function () {
+        // Chat list
         Route::get('/', [App\Http\Controllers\ChatController::class, 'index'])->name('index');
+        
+        // 🔥 BARU: Sync chats from WAHA
+        Route::post('/sync', [App\Http\Controllers\ChatController::class, 'syncChats'])->name('sync');
+        
+        // Sync messages (existing - keep as is)
         Route::get('/{chat}/messages/sync', [App\Http\Controllers\ChatController::class, 'syncMessages'])->name('messages.sync');
+        
+        // Show conversation
         Route::get('/{account}', [App\Http\Controllers\ChatController::class, 'show'])->name('show');
         Route::get('/{account}/{chat}', [App\Http\Controllers\ChatController::class, 'show'])->name('conversation');
-        Route::post('/{account}/send', [App\Http\Controllers\ChatController::class, 'send'])->name('send');
-        Route::get('/{chat}/messages', [App\Http\Controllers\ChatController::class, 'loadMessages'])->name('messages');
         
-        Route::get('/{chat}/messages/new', [App\Http\Controllers\ChatController::class, 'getNewMessages'])->name('messages.new'); // 👈 TAMBAHKAN INI
+        // Send message
+        Route::post('/{account}/send', [App\Http\Controllers\ChatController::class, 'send'])->name('send');
+        
+        // Get messages
+        Route::get('/{chat}/messages', [App\Http\Controllers\ChatController::class, 'loadMessages'])->name('messages');
+        Route::get('/{chat}/messages/new', [App\Http\Controllers\ChatController::class, 'getNewMessages'])->name('messages.new');
+        
+        // 🔥 BARU: Refresh chat picture
+        Route::post('/{chat}/picture/refresh', [App\Http\Controllers\ChatController::class, 'refreshPicture'])->name('picture.refresh');
+        
+        // Archive/Unarchive
         Route::post('/{chat}/archive', [App\Http\Controllers\ChatController::class, 'archive'])->name('archive');
         Route::post('/{chat}/unarchive', [App\Http\Controllers\ChatController::class, 'unarchive'])->name('unarchive');
+        
+        // Delete chat
         Route::delete('/{chat}', [App\Http\Controllers\ChatController::class, 'destroy'])->name('destroy');
     });
+
 });
 
 // Admin routes

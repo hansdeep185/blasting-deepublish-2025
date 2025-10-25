@@ -13,6 +13,7 @@ class Chat extends Model
         'account_id',
         'contact_phone',
         'contact_name',
+        'picture_url',      // 🔥 TAMBAHAN BARU
         'last_message',
         'last_message_at',
         'unread_count',
@@ -156,5 +157,39 @@ class Chat extends Model
             return strtoupper(substr($this->contact_name, 0, 2));
         }
         return strtoupper(substr($this->contact_phone, -2));
+    }
+
+    /**
+     * 🔥 BARU: Get chat picture URL or generate default avatar
+     */
+    public function getPictureUrlAttribute($value): ?string
+    {
+        return $value;
+    }
+
+    /**
+     * 🔥 BARU: Check if chat has custom picture
+     */
+    public function hasPicture(): bool
+    {
+        return !empty($this->attributes['picture_url']);
+    }
+
+    /**
+     * 🔥 BARU: Get avatar - picture or initials
+     */
+    public function getAvatarAttribute(): array
+    {
+        if ($this->hasPicture()) {
+            return [
+                'type' => 'image',
+                'url' => $this->picture_url,
+            ];
+        }
+
+        return [
+            'type' => 'initials',
+            'initials' => $this->initials,
+        ];
     }
 }

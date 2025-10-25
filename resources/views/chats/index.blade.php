@@ -54,12 +54,24 @@
                 <a href="{{ route('chats.conversation', ['account' => $selectedAccount->id, 'chat' => $chat->id]) }}" 
                    class="d-block text-decoration-none text-dark border-bottom chat-item {{ request()->route('chat') == $chat->id ? 'active' : '' }}">
                     <div class="p-3 d-flex align-items-start">
-                        <!-- Avatar -->
+                        <!-- Avatar with Picture Support -->
                         <div class="flex-shrink-0 me-3">
-                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
-                                 style="width: 50px; height: 50px;">
-                                <strong>{{ $chat->initials }}</strong>
-                            </div>
+                            @if($chat->hasPicture())
+                                <img src="{{ $chat->picture_url }}" 
+                                     class="rounded-circle" 
+                                     style="width: 50px; height: 50px; object-fit: cover;"
+                                     alt="{{ $chat->display_name }}"
+                                     onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                <div class="rounded-circle bg-primary text-white align-items-center justify-content-center" 
+                                     style="width: 50px; height: 50px; display: none;">
+                                    <strong>{{ $chat->initials }}</strong>
+                                </div>
+                            @else
+                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" 
+                                     style="width: 50px; height: 50px;">
+                                    <strong>{{ $chat->initials }}</strong>
+                                </div>
+                            @endif
                         </div>
                         
                         <!-- Chat Info -->
@@ -92,11 +104,14 @@
                 @endforelse
             </div>
 
-            <!-- New Chat Button -->
+            <!-- 🔥 FIXED: Only ONE button section -->
             @if($chats->count() > 0)
-            <div class="p-3 border-top">
-                <button class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#newChatModal">
+            <div class="p-3 border-top d-flex gap-2">
+                <button class="btn btn-primary flex-grow-1" data-bs-toggle="modal" data-bs-target="#newChatModal">
                     <i class="bi bi-plus-circle me-2"></i>New Chat
+                </button>
+                <button class="btn btn-outline-secondary" onclick="syncChats()" id="syncChatsBtn" title="Sync from WhatsApp">
+                    <i class="bi bi-arrow-clockwise"></i>
                 </button>
             </div>
             @endif
@@ -143,6 +158,59 @@
         </div>
     </div>
 </div>
+@endsection
+
+@push('scripts')
+<script>
+async function syncChats() {
+    const btn = document.getElementById('syncChatsBtn');
+    const icon = btn.querySelector('i');
+    
+    // Disable button & add spinning animation
+    btn.disabled = true;
+    icon.classList.add('fa-spin');
+    
+    try {
+        const response = await fetch('/chats/sync', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                account_id: {{ $selectedAccount->id }}
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showToast('success', data.message || 'Chats synced successfully');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('error', data.error || 'Failed to sync chats');
+        }
+    } catch (error) {
+        console.error('Sync error:', error);
+        showToast('error', 'An error occurred while syncing');
+    } finally {
+        btn.disabled = false;
+        icon.classList.remove('fa-spin');
+    }
+}
+
+function showToast(type, message) {
+    const toastClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const toast = document.createElement('div');
+    toast.className = `alert ${toastClass} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+}
+</script>
+@endpush
 
 <style>
 .chat-item {
@@ -155,4 +223,3 @@
     background-color: #e8f5e9;
 }
 </style>
-@endsection

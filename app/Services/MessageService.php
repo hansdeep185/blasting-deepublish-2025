@@ -31,9 +31,10 @@ class MessageService
             // Format phone number
             $chatId = $this->formatChatId($chat->contact_phone);
 
-            // Send via WAHA
-            $result = $this->wahaService->sendText(
-                $account->waha_session_id,
+            // Send via WAHA - FIXED: menggunakan sendMessage() bukan sendText()
+            // dan menggunakan session_name bukan waha_session_id
+            $result = $this->wahaService->sendMessage(
+                $account->session_name,
                 $chatId,
                 $text
             );
@@ -99,13 +100,12 @@ class MessageService
             // Format phone number
             $chatId = $this->formatChatId($chat->contact_phone);
 
-            // Send via WAHA
+            // Send via WAHA - FIXED: menggunakan session_name
             $result = $this->wahaService->sendImage(
-                $account->waha_session_id,
+                $account->session_name,
                 $chatId,
                 $imageUrl,
-                $caption,
-                $filename
+                $caption
             );
 
             if ($result['success']) {
@@ -161,35 +161,16 @@ class MessageService
             // Format phone number
             $chatId = $this->formatChatId($chat->contact_phone);
 
-            // Send via WAHA
-            $result = $this->wahaService->sendDocument(
-                $account->waha_session_id,
-                $chatId,
-                $fileUrl,
-                $filename,
-                $caption
-            );
-
-            if ($result['success']) {
-                $message->markAsSent(
-                    $result['data']['id'] ?? null,
-                    $result['data'] ?? null
-                );
-
-                $chat->updateLastMessage($message);
-
-                return [
-                    'success' => true,
-                    'message' => $message,
-                ];
-            }
-
-            $message->markAsFailed($result['error'] ?? 'Failed to send');
+            // CATATAN: Method sendDocument() belum ada di WahaApiService
+            // Anda perlu menambahkannya atau gunakan sendImage untuk sementara
+            Log::warning('sendDocument called but not implemented in WahaApiService', [
+                'chat_id' => $chat->id,
+                'filename' => $filename,
+            ]);
 
             return [
                 'success' => false,
-                'error' => $result['error'] ?? 'Failed to send document',
-                'message' => $message,
+                'error' => 'Document sending not yet implemented',
             ];
 
         } catch (\Exception $e) {
