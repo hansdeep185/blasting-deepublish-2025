@@ -12,7 +12,7 @@ class DatabaseSeeder extends Seeder
         // 1. Create default admin (Menggunakan ENV)
         User::create([
             'name' => env('ADMIN_NAME', 'Default Admin'), 
-            'email' => env('ADMIN_EMAIL', 'admin@example.com'),
+            'email' => env('ADMIN_EMAIL', 'supportit@deepublish.co.id'),
             'role' => 'admin',
             'is_active' => true,
             'message_quota' => 999999,
@@ -22,7 +22,7 @@ class DatabaseSeeder extends Seeder
 
         User::create([
             'name' => 'Demo User',
-            'email' => 'demo.user@mail.test', 
+            'email' => 'pdsihoy@gmail.com', 
             'role' => 'user',
             'is_active' => true,
             'message_quota' => 10000,

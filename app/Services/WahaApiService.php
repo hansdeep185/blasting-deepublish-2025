@@ -4,6 +4,8 @@ namespace App\Services;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
+use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Log;
 
 class WahaApiService
@@ -14,8 +16,15 @@ class WahaApiService
 
     public function __construct()
     {
-        $this->baseUrl = settings('waha_base_url');
-        $this->apiKey = settings('waha_api_key');
+        if (App::runningInConsole() && !Schema::hasTable('settings')) {
+            $this->baseUrl = '';
+            $this->apiKey = '';
+        } else {
+            $this->baseUrl = settings('waha_base_url');
+            $this->apiKey = settings('waha_api_key');
+        }
+        #$this->baseUrl = settings('waha_base_url');
+        #$this->apiKey = settings('waha_api_key');
 
         $this->client = new Client([
             'base_uri' => $this->baseUrl,
